@@ -1,0 +1,11 @@
+{
+  "name": "file_system",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node /opt/res/heartBeatsGenerator/heartBeatGenerator.js" 
+  },
+  "dependencies": {
+    "express": "*"
+  }
+}
