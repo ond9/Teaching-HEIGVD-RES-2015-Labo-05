@@ -14,18 +14,45 @@ var host = "localhost", port = 33333;
 var dgram = require( "dgram" );
 var server = dgram.createSocket( "udp4" );
 
-var idClient = 0;
+/* dockerode API */
+var Docker = require('dockerode');
+var docker = new Docker(); // to check don't know if correct
+var container = docker.getContainer('name_of_loadBalancer_or_ID');
+
 var listCLient = [];
 var timeInterval = 5000; // check every 5 seconds 
 var timeOut = 10000; // timeout is 10 seconds max
 
 // client struct
 function Client(ID, ip, port, msg, date) {
-  this.ID = ID;
   this.ip = ip;
   this.port = port;
   this.msg = msg;
   this.date = date;
+}
+
+
+/*
+ *
+ * rewrite conf file + do reboot of loadbalancer
+ *
+ */
+function UpdateConfig(listOfClient) {
+    /* write conf file  GO => HandleBars */
+  /*Handlebars.registerHelper('list', function(listOfClient) {
+    var out = "";
+
+    for(var i=0, l=listOfClient.length; i<l; i++) {
+      out = out + listOfClient[i].ip + ":" + listOfClient[i].port + "\n";
+    }
+
+    return out;
+  });*/
+
+  /*do reboot loadbalancer */
+  /*container.start(function (err, data) { // maybe restart ?
+    console.log(data);
+  });*/
 }
 
 /*
@@ -53,12 +80,17 @@ Array.prototype.contains = function(obj) {
  */
 server.on( "message", function( msg, rinfo ) {
 
-    var p1 = new Client(idClient++, rinfo.address, rinfo.port, msg);
+    var p1 = new Client( rinfo.address, rinfo.port, msg);
     console.log('new msg received');
 
+
+    /*new client come */
     if ( !listCLient.contains(p1) ) {
       listCLient.push(p1);
-      console.log('client est '  + p1.ID + ' : ' + p1.ip + ' : ' + p1.port + ' msg: ' + p1.msg, new Date());
+
+      UpdateConfig(listCLient);
+
+      console.log('client est : ' + p1.ip + ' : ' + p1.port + ' msg: ' + p1.msg, new Date());
     }
     else {
       delete p1;
@@ -89,6 +121,7 @@ setInterval( function() {
   for (var i = 0, len = listCLient.length; i < len; i++) {
     if ( now - listCLient[i].date > timeOut) {
       listCLient.pop(listCLient[i]);
+      UpdateConfig(listCLient);
       console.log('client removed');
     }
   }
