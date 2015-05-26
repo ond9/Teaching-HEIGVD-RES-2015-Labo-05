@@ -1,29 +1,30 @@
 /*
  * st4ck 2015 Monitor
- * it seem to work (maybe a)
+ * it seem to work (maybe)
  *
  * I do all of this like a fool... 
  * i have to look fo an object oriented version
- * 
- * comment : idClient is incremented and older disconnected idClient never can be resused
- * have to get better approch (ID is realy needed ?)
  *
  */
 
+/* UDP stuff */
 var port = 33333;
 var dgram = require( "dgram" );
 var server = dgram.createSocket( "udp4" );
 
 /* dockerode API */
-var Docker = require('dockerode');
+var Docker = require("dockerode");
 var docker = new Docker(); // to check don't know if correct
-var container = docker.getContainer('reverse_proxy');
+var container = docker.getContainer("reverse_proxy");
 
 var listClient = [];
 var timeInterval = 5000; // check every 5 seconds 
 var timeOut = 10000; // timeout is 10 seconds max
+var path_httpd_file = new Buffer("/tmp/httpd.conf")
 
 
+/* head and tail of httpd.conf file */
+/* note: maybe have to use templating (Handlebars) if i have time */
 var httpd_head = new Buffer("<VirtualHost *:80> \n\
    \tProxyRequests off \n\
    \n\
@@ -53,21 +54,21 @@ function Client(ip, port, ID, TYPE, date_timeout) {
 
 /*
  *
- * rewrite conf file + do reboot of loadbalancer
+ * rewrite conf file + reboot of loadbalancer
  *
  */
 function UpdateConfig(listOfClient) {
  
   var fs = require('fs');
 
-  var http_content = new Buffer(httpd_head);
+  var httpd_content = new Buffer(httpd_head);
 
   for(var i = 0 ; i < listOfClient.length ; i++){
     if(listOfClient[i].TYPE === "frontend")
-      http_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":80 route=["+ listOfClient[i].ID +"]\n";
+      httpd_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":8000 route=["+ listOfClient[i].ID +"]\n";
   }
 
-  http_content += "\n\t\tProxySet stickysession=ROUTEID \n\
+  httpd_content += "\n\t\tProxySet stickysession=ROUTEID \n\
       \t\tProxySet lbmethod = byrequests \n\
    \t</Proxy> \
    \n\
@@ -75,16 +76,14 @@ function UpdateConfig(listOfClient) {
 
    for(var i = 0; i < listOfClient.length ; i++){
     if(listOfClient[i].TYPE == "backend" )
-      http_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":80\n";
-    else
-      console.log(listOfClient[i].TYPE + " != backend");
+      httpd_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":8000\n";
   }
 
-  http_content += "\n" + httpd_tail;
+  httpd_content += "\n" + httpd_tail;
 
-  fs.writeFile("/tmp/test", http_content);
+  fs.writeFile(path_httpd_file, httpd_content);
 
-  /*do reboot loadbalancer */
+  /*reboot loadbalancer */
   container.start(function (err, data) { // maybe restart ?
     console.log(data);
   });
@@ -99,7 +98,7 @@ Array.prototype.contains = function(obj) {
     var i = this.length;
     while (i--) {
         if (this[i].ip === obj.ip) {
-            this[i] = obj // update client
+            this[i] = obj // update client (mostly due to Date.now() updating)
             return true;
         }
     }
@@ -117,8 +116,6 @@ server.on( "message", function( msg, rinfo ) {
     var id = msg.toString().substr(3, 64);
     var type = msg.toString().substr(74, 7);
     var p1 = new Client( rinfo.address, rinfo.port, id, type, Date.now());
-    console.log('new msg received');
-
 
     /*new client come */
     if ( !listClient.contains(p1) ) {
@@ -126,7 +123,7 @@ server.on( "message", function( msg, rinfo ) {
       
       UpdateConfig(listClient);
 
-      console.log('client est : ' + p1.ip + ' : ' + p1.port + ' id: ' + p1.ID + ' type: ' + p1.TYPE, p1.date_timeout);
+      console.log('new client : ' + p1.ip + ' : ' + p1.port + ' id: ' + p1.ID + ' type: ' + p1.TYPE);
     }
     else {
       delete p1;
@@ -134,6 +131,10 @@ server.on( "message", function( msg, rinfo ) {
 
 });
 
+/*
+ * Binding and subscribe to multicast group
+ *
+ */
 server.bind( port, function() {
   server.setBroadcast(true);
   server.setMulticastTTL(128);
