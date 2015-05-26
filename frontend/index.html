@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en_US">
+	<head>
+		<title></title>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+		<!--
+		<script src="http://localhost/jquery-1.11.3.min.js"></script>
+		-->
+		<script>
+			function loadNewQuote() {
+				//var url = "http://localhost/api";
+				var url = "http://localhost:8000/api";
+				$.getJSON(url, {format: "json"}).done(function(data) {
+					$.each(data, function(key, val) {
+						if (key == 'quote') {
+							console.log(val.toString());
+							document.getElementById("quote").innerHTML = val;
+						}
+						else if (key == 'ip') {
+							console.log(val.toString());
+							document.getElementById("backendIP").innerHTML = val;
+						}
+					});
+				});
+			}
+		</script>
+	</head>
+	<body onload="loadNewQuote()">
+		<h1>Wonderfull Quotes From Beyond the InterWeb</h1>
+		<div>
+			<a id="quote"></a>
+		</div>
+		<form name="getNewQuote" action="gen_html.sh" method="POST">
+			<div align="center">
+				<input type="button" onClick="loadNewQuote()" value="Get quote!">
+			</div>
+		</form>
+		<br\>
+		<br\>
+		IP backend: <a id="backendIP"></a>
+	</body>
+</html>
