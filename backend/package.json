@@ -1,9 +1,9 @@
 {
-  "name": "file_system",
+  "name": "volume",
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node /opt/res/heartBeatsGenerator/heartBeatGenerator.js" 
+    "start": "node volume/heartBeatsGenerator/heartBeatGenerator.js hello" 
   },
   "dependencies": {
     "express": "*"

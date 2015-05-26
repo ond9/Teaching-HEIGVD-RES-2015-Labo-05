@@ -1,9 +1,9 @@
 {
-  "name": "file_system",
+  "name": "volume",
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node /opt/res/heartBeatsMonitor/heartbeats-monitor.js" 
+    "start": "node volume/heartBeatsMonitor/heartbeats-monitor.js" 
   },
   "dependencies": {
     "handlebars": "~3.0.3",
