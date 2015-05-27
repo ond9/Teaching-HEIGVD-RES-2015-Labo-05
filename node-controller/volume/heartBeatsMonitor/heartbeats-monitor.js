@@ -20,7 +20,7 @@ var container = docker.getContainer("reverse_proxy");
 var listClient = [];
 var timeInterval = 5000; // check every 5 seconds 
 var timeOut = 10000; // timeout is 10 seconds max
-var path_httpd_file = new Buffer("/tmp/httpd.conf")
+var path_httpd_file = new Buffer("/shared_volume/httpd-vhosts.conf")
 
 
 /* head and tail of httpd.conf file */
@@ -64,7 +64,7 @@ function UpdateConfig(listOfClient) {
   var httpd_content = new Buffer(httpd_head);
 
   for(var i = 0 ; i < listOfClient.length ; i++){
-    if(listOfClient[i].TYPE === "frontend")
+    if(listOfClient[i].TYPE == "fronten")
       httpd_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":8000 route=["+ listOfClient[i].ID +"]\n";
   }
 
@@ -81,7 +81,7 @@ function UpdateConfig(listOfClient) {
 
   httpd_content += "\n" + httpd_tail;
 
-  fs.writeFile(path_httpd_file, httpd_content);
+  fs.writeFile(path_httpd_file.toString(), httpd_content);
 
   /*reboot loadbalancer */
   container.start(function (err, data) { // maybe restart ?
@@ -115,9 +115,10 @@ server.on( "message", function( msg, rinfo ) {
 
     var id = msg.toString().substr(3, 64);
     var type = msg.toString().substr(74, 7);
-    var p1 = new Client( rinfo.address, rinfo.port, id, type, Date.now());
 
     /*new client come */
+    var p1 = new Client( rinfo.address, rinfo.port, id, type, Date.now());
+
     if ( !listClient.contains(p1) ) {
       listClient.push(p1);
       

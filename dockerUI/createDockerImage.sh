@@ -1,3 +1,3 @@
 #!/bin/bash
-docker build -t dockerui/dockerui-container .
+docker build -t dockerui/dockerui .
 docker images

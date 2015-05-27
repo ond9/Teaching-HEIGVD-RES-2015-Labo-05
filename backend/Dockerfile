@@ -20,4 +20,7 @@ MAINTAINER Olivier Liechti
 # we install the PM2 process manager
 #
 RUN npm install -g pm2@0.12.9
+RUN npm install 
+RUN apt-get update
+RUN apt-get install -y fortune-mod
 

@@ -12,8 +12,6 @@ MAINTAINER Olivier Liechti
 # When we create the image, we copy files from the host into
 # the image file system. This is NOT a shared folder!
 #
-#COPY file_system /opt/res/
-#VOLUME /volume
 
 
 #

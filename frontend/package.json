@@ -3,9 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "chmod +x volume/heartBeatsGenerator/heartBeatGenerator.sh; ./volume/heartBeatsGenerator/heartBeatGenerator.sh
+    "start": "./volume/heartBeatsGenerator/heartBeatGenerator.sh & node volume/frontend.js"
   },
   "dependencies": {
-    "express": "*"
   }
 }
