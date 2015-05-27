@@ -5,7 +5,7 @@ var spawn = require('child_process').spawn;
 var server = http.createServer().listen(8000);
 
 server.on('request', function(req, res) {
-	if(req.url == '/api?format=json') {
+	//if(req.url == '/api?format=json') {
 		req.setEncoding('utf8');
 
 		var ifaces = os.networkInterfaces();
@@ -40,10 +40,13 @@ server.on('request', function(req, res) {
 
 			console.log(json);
 		});
-	}
+	
+/*
+}
 	else {
 			res.writeHead(404);
 			res.end();
 			console.log('Not found: request ' + req.url.toString());
 	}
+*/
 });

@@ -15,7 +15,7 @@ MAINTAINER Olivier Liechti
 #COPY file_system /opt/res/
 #VOLUME /volume
 
-EXPOSE 80 
+EXPOSE 8000
 
 #
 # With RUN, we can execute commands when we create the image. Here,

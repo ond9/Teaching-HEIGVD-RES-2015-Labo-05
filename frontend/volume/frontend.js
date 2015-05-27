@@ -2,7 +2,7 @@
 var os = require('os');
 var http = require('http');
 
-var server = http.createServer().listen(80);
+var server = http.createServer().listen(8000);
 
 server.on('request', function(req, res) {
 	if(req.url == '/') {

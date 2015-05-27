@@ -26,19 +26,20 @@ var path_httpd_file = new Buffer("/shared_volume/httpd-vhosts.conf")
 /* head and tail of httpd.conf file */
 /* note: maybe have to use templating (Handlebars) if i have time */
 var httpd_head = new Buffer("<VirtualHost *:80> \n\
+   \tServerName 192.168.42.42 \n\
    \tProxyRequests off \n\
    \n\
    \tHeader add Set-Cookie \"ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/\" env=BALANCER_ROUTE_CHANGED \n\
-   \t<Proxy balancer://frontend>");
+   \t<Proxy balancer://frontend> \n\
+   \t\tProxySet lbmethod=byrequests" );
 
 
-var httpd_tail = new Buffer("\t\tProxySet lbmethod = byresquests \n\
-   \t</Proxy> \n\
+var httpd_tail = new Buffer("\t</Proxy> \n\
    \n\
-   \tProxyPass /api/ balancer://backend/ \n\
+   \tProxyPass /api balancer://backend/ \n\
    \tProxyPass /    balancer://frontend/ \n\
-   \tProxyPassReverse /api/ balancer://backend/ \n\
-   \tProdyPassReverse /  balancer://frontend/ \n\
+   \tProxyPassReverse /api balancer://backend/ \n\
+   \tProxyPassReverse /  balancer://frontend/ \n\
    \n\
 </VirtualHost>")
 
@@ -63,13 +64,14 @@ function UpdateConfig(listOfClient) {
 
   var httpd_content = new Buffer(httpd_head);
 
+  httpd_content += "\n";
+
   for(var i = 0 ; i < listOfClient.length ; i++){
     if(listOfClient[i].TYPE == "fronten")
-      httpd_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":8000 route=["+ listOfClient[i].ID +"]\n";
+      httpd_content += "\t\tBalancerMember http://" + listOfClient[i].ip + ":8000 route="+ listOfClient[i].ID +"\n";
   }
 
   httpd_content += "\n\t\tProxySet stickysession=ROUTEID \n\
-      \t\tProxySet lbmethod = byrequests \n\
    \t</Proxy> \
    \n\
    \t<Proxy balancer://backend>\n";
@@ -113,7 +115,7 @@ Array.prototype.contains = function(obj) {
  */
 server.on( "message", function( msg, rinfo ) {
 
-    var id = msg.toString().substr(3, 64);
+    var id = msg.toString().substr(3, 60);
     var type = msg.toString().substr(74, 7);
 
     /*new client come */
