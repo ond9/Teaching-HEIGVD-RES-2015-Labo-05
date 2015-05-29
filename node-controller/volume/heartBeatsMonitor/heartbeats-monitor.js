@@ -26,7 +26,7 @@ var path_httpd_file = new Buffer("/shared_volume/httpd-vhosts.conf")
 /* head and tail of httpd.conf file */
 /* note: maybe have to use templating (Handlebars) if i have time */
 var httpd_head = new Buffer("<VirtualHost *:80> \n\
-   \tServerName 192.168.42.42 \n\
+   \tServerName demo.applicationres.com \n\
    \tProxyRequests off \n\
    \n\
    \tHeader add Set-Cookie \"ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/\" env=BALANCER_ROUTE_CHANGED \n\
@@ -36,8 +36,8 @@ var httpd_head = new Buffer("<VirtualHost *:80> \n\
 
 var httpd_tail = new Buffer("\t</Proxy> \n\
    \n\
-   \tProxyPass /api balancer://backend/ \n\
-   \tProxyPass /    balancer://frontend/ \n\
+   \tProxyPassMatch /api/* balancer://backend/ \n\
+   \tProxyPassMatch /*     balancer://frontend/ \n\
    \tProxyPassReverse /api balancer://backend/ \n\
    \tProxyPassReverse /  balancer://frontend/ \n\
    \n\
