@@ -19,8 +19,6 @@ EXPOSE 8000
 # With RUN, we can execute commands when we create the image. Here,
 # we install the PM2 process manager
 #
-RUN npm install -g pm2@0.12.9
-RUN npm install 
-RUN apt-get update
-RUN apt-get install -y fortune-mod
+#RUN npm install -g pm2@0.12.9; npm install; apt-get update; apt-get install fortune-mod fortunes fortunes-fr fortunes-off -y
+RUN npm install -g pm2@0.12.9; npm install; apt-get update; apt-get install fortune-mod fortunes -y
 
