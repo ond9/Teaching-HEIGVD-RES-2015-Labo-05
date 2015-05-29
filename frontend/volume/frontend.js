@@ -18,7 +18,7 @@ server.on('request', function(req, res) {
 	-->\n\
 	<script>\n\
 	function loadNewQuote() {\n\
-	   var url = \"http://localhost/api\";\n\
+	   var url = \"http://192.168.42.42/api\";\n\
 	 	  $.getJSON(url, {format: \"json\"}).done(function(data) {\n\
 	 	  $.each(data, function(key, val) {\n\
 	 		  if (key == 'quote') {\n\
