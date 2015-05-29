@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker run -d --name frontend-container frontend/frontend-container
+docker run -d --name $1 frontend/frontend-container

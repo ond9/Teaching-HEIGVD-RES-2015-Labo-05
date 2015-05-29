@@ -15,7 +15,7 @@ var server = dgram.createSocket( "udp4" );
 /* dockerode API */
 var Docker = require("dockerode");
 var docker = new Docker(); // to check don't know if correct
-var container = docker.getContainer("reverse_proxy");
+var container = docker.getContainer("reverse-proxy-lb");
 
 var listClient = [];
 var timeInterval = 5000; // check every 5 seconds 
@@ -86,7 +86,7 @@ function UpdateConfig(listOfClient) {
   fs.writeFile(path_httpd_file.toString(), httpd_content);
 
   /*reboot loadbalancer */
-  container.start(function (err, data) { // maybe restart ?
+  container.restart(function (err, data) { // maybe restart ?
     console.log(data);
   });
 }
