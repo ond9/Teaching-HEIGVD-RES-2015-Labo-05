@@ -141,6 +141,21 @@ route ne pointera que vers une seule machine et toujours la même.
 Tous les échanges effectués entre les \emph{front-end}s, les \emph{back-end}s et le \emph{node controller} sont effectués par
 UDP et sont des JSONs.
 
+\section{Strategie de validation}
+\subsection{Test du \emph{load balancer}}
+Afin de tester que notre implémentation soit correcte, un web browser (Google Chrome) a été utilisé pour ouvrir la page web,
+qui affiche aussi bien l'adresse IP du \emph{font-end} que celle du \emph{back-end}. Lorsque la quote était renouvellée en
+appuyant sur le bouton de la page web pour renouveller les quotes, l'adresse IP du \emph{back-end} était effectivement modifiée.
+Par contre, si la page était rechargée, le \emph{front-end} était le même. Ce qui est normal, le cookie est conservé. En
+utilisant le mode de navigation privée de Chrome, qui ne conserve pas les cookies, et n'utilise pas de cache, l'adresse IP du
+\emph{front-end} change avec un rechargement de la page. Le \emph{load balancer} fonctionne donc correctement.
+
+\subsection{Test du \emph{node controller}}
+Afin de tester si le système détecte l'apparition ou la disparition d'un node, un container \emph{Docker} est supprimé, dans
+les quelques secondes suivantes, la configuration du \emph{reverse proxy} est modifié pour prendre en compte la disparition du
+n\oe{}ud. Ensuite un nouveau container \emph{Docker} est créé. À nouveau, la configuration est modifiée pour prendre en compte
+ces changements. 
+
 \section{Conclusions}
 À la fin de ce laboratoire, nous avons obtenu un système fonctionnel, et se comportant de manière idoine, et fidèle aux
 objectifs fixés. Nous avons également appris de manière concrète le fonctionnement d'une architecture web. Nous pouvons
