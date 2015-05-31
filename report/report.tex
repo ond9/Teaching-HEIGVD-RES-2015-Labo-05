@@ -66,6 +66,15 @@ fonctionne correctement.
 Afin d'avoir un système le plus léger possible, et qui soit aisé à implémenter, le \emph{back-end} à été réalisé en
 javascript avec \emph{Node.js}.
 
+En parallèle, le \emph{back-end} possède un \emph{Heartbeat generator}, un programme en javascript envoyant en continu
+toutes les 10 secondes un message en UDP sur un port définit, sur l'adresse IP multicast définie \texttt{224.1.1.1}.
+Ce message JSON contient les 2 champs suivants:
+
+\begin{itemize}
+	\item le type du client ( backend ou fronten ) 
+	\item l'ID du container \emph{Docker}
+\end{itemize}
+
 \subsubsection{\emph{Front-end}}
 Le \emph{front-end} est un serveur HTTP répondant à chaque requête par un page HTML contenant un javascript permettant
 de faire une requête pour récupérer une citation. Cette requête sera redirigée vers le back-end par le
@@ -73,18 +82,64 @@ de faire une requête pour récupérer une citation. Cette requête sera redirig
 HTML générée contient l'adresse IP du \emph{front-end}.
 
 Pour les même raisons que pour le \emph{back-end}, le \emph{front-end} à été réalisé en javascript avec \emph{Node.js}.
-Notons aussi, que ce serveur est une implémentation minimale conçue dans le cadre de ce laboratoire, et devrait être
-grandement améliorée pour toutes utilisation réelle.
+
+De la même manière que le \emph{back-end}, le \emph{front-end} possède lui aussi un \emph{heartbeat generator} envoyant
+des messages en continu sur l'adresse multicast \texttt{224.1.1.1} et sur un port définit.
 
 \subsubsection{\emph{Node controller}}
+Le \emph{node controller} (server) écoute sur un port et attend des paquet entrant contenant 2 champs:
+
+\begin{itemize}
+	\item le type 
+	\item l'ID du container \emph{Docker}
+\end{itemize}
+
+Le contrôleur contient une structure de donnée \texttt{client} et un tableau de client \texttt{clients[]}.
+
+La structure de donnée \texttt{client} contient simplement des variable\footnote{voir code source}: \texttt{ip},
+\texttt{id}, \texttt{type}, \texttt{date}\footnote{\texttt{DATE} = chiffre représentant le nombre de millisecondes
+écoulées depuis l'epoch.}, \ldots
+
+À l'arrivée d'un message pas un client le serveur crée un client avec la structure décrite ci-dessus.
+
+Si l'adresse IP du client qui vient d'envoyer le message n'est pas contenu dans le tableau de clients que contient le serveur, 
+le \emph{node controller} ajoute le client précédemment créé au tableau de clients, met à jour le fichier de configuration
+d'\emph{Apache} et redémarre le \emph{reverse proxy}. Sinon, si l'adresse IP du client est déjà contenue dans le tableau, le
+\emph{node controller} ne fait que mettre à jour le timestamp du client en question, puis supprime le client précédemment créé. 
+
+En parallèle de ceci, Le serveur parcoure toutes les 5 seconde le tableau de client et vérifie le \emph{timestamp} de chaque
+client. Si le temps écoulé depuis son arrivée dépasse 10 secondes, le \emph{node controler} retire le client de la liste et
+met à jour le fichier de configuration d'\emph{Apache} et redémarre le \emph{reverse proxy}, sinon ne fait rien.
 
 \subsubsection{\emph{Reverse proxy et load balancer}}
-Nous avons choisi d'implémenter ce point grâce au service httpd (apache2).
-Le reverse proxy est le seul point d'entrée extérieur à notre architecture. En effet il sert à masquer le fait qu'il y aie plusieurs machines derrière une adresse, il se chargera de transmettre les différentes requêtes au bon endroit et de retourner les réponses. Il fait en même temps la distribution du travail (load balancer) lorsqu'il a plusieurs possibilités vers qui envoyer une requête (parce qu'on a plusieurs machines qui sont capables de faire la même chose, plusieurs frontend et backend) il va choisir de les distribuer équitablement afin de partager le travail. Nous avons choisi ici d'implémenter une méthode "Round-Robin". La communication avec le front-end est en sticky session avec un cookie qui permet de spécifier la route (donc quel frontend) comme ça si un client a commencé à communiquer avec un frontend il va continuer avec ce frontend tant qu'il donne le cookie, si un nouveau client arrive (sans cookie donc) le load balancer va le rediriger au prochain frontend comme indiqué par notre police "Round-Robin".
-Le fichier de configuration du reverse proxy - load balancer est généré par le node-controller et est mis à jour à chaque changement dans les services disponibles (nouveau frontend ou backend ou bien si un frontend ou backend n'est plus disponible). Pour rendre effectif la modification nous relançons la machine depuis le node-controller (qui a les privilèges) avec Dockerode, dans le fichier de configuration de httpd il est spécifié de charger notre fichier de configuration spécifique qui est partagé entre le node controller et cette machine-ci.
-Note: La route pour la sticky session est l'ID unique du container vers qui la route pointe, ceci nous garantit que si la machine tombe et se relance la route sera conservée, si on utilisais des entier 1,2,3 etc... si la machine 2 tombe et que la machine 3 prends la place du 2 la route 2 renverrait vers une autre machine qu'au par avant. Avec les ID uniques une route ne pointera que vers une seule machine et toujours la même.
+Nous avons choisi d'implémenter ce point grâce au service \emph{httpd} (\emph{Apache 2}).
+
+Le \emph{reverse proxy} est le seul point d'entrée extérieur à notre architecture. En effet il sert à masquer le fait qu'il y
+aie plusieurs machines derrière une adresse, il se chargera de transmettre les différentes requêtes au bon endroit et de
+retourner les réponses. Il fait en même temps la distribution du travail (\emph{load balancer}) lorsqu'il a plusieurs
+possibilités vers qui envoyer une requête (parce qu'on a plusieurs machines qui sont capables de faire la même chose,
+plusieurs \emph{front-end} et \emph{back-end}) il va choisir de les distribuer équitablement afin de partager le travail.
+Nous avons choisi ici d'implémenter une méthode ``Round-Robin''. La communication avec le \emph{front-end} est en
+\emph{sticky session} avec un cookie qui permet de spécifier la route (donc quel \emph{front-end}) comme ça si un client a
+commencé à communiquer avec un \emph{front-end} il va continuer avec ce \emph{front-end} tant qu'il donne le cookie, si un
+nouveau client arrive (sans cookie donc) le \emph{load balancer} va le rediriger au prochain \emph{front-end} comme indiqué
+par notre police ``Round-Robin''.
+
+Le fichier de configuration du \emph{reverse proxy} ---\emph{load balancer} est généré par le \emph{node controller} et est
+mis à jour à chaque changement dans les services disponibles (nouveau \emph{front-end} ou \emph{back-end} ou bien si un
+\emph{front-end} ou \emph{back-end} n'est plus disponible). Pour rendre effectif la modification nous relançons la machine
+depuis le \emph{node controller} (qui a les privilèges) avec \emph{Dockerode}, dans le fichier de configuration de
+\emph{httpd} il est spécifié de charger notre fichier de configuration spécifique qui est partagé entre le \emph{node
+controller} et cette machine.
+
+Note: La route pour la \emph{sticky session} est l'ID unique du container vers qui la route pointe, ceci nous garantit que si
+la machine tombe et se relance la route sera conservée, si on utilisais des entier (1, 2, 3, \ldots) si la machine 2 tombe et
+que la machine 3 prends la place du 2 la route 2 renverrait vers une autre machine qu'auparavant. Avec les ID uniques une
+route ne pointera que vers une seule machine et toujours la même.
 
 \subsection{Protocoles de communications utilisés}
+Tous les échanges effectués entre les \emph{front-end}s, les \emph{back-end}s et le \emph{node controller} sont effectués par
+UDP et sont des JSONs.
 
 \section{Conclusions}
 À la fin de ce laboratoire, nous avons obtenu un système fonctionnel, et se comportant de manière idoine, et fidèle aux
