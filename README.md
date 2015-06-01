@@ -1,97 +1,190 @@
-# RES: Web Infrastructure Lab
+Introduction[^1]
+================
 
-### Objectives
+Le but principal de ce laboratoire est d’apprendre à mettre en place une
+architecture web, et de se familiariser avec des différents composants,
+tels que les serveurs HTTP, les *load balancers* ou les *reverse
+proxies*.
 
-The main goal of this lab is to learn **how to setup a web infrastructure** and to become familiar with the role of several components (http servers, reverse proxies, load balancers). 
+Il est également nécessaire de mettre en place un système de découverte
+automatique de services permettant de “voire” si un serveur HTTP est
+apparu ou a disparu de l’infrastructure et a réagir a ces changement en
+modifiant automatiquement la configuration du *load balancer*.
 
-This will be done in a **virtualized environment** based on VirtualBox, Vagrant and Docker. By now, you should already be familiar with these tools, but in the context of the lab you will discover a couple of new features and techniques (e.g. how to share data between containers with volumes).
+Le tout est fait dans un environnement virtualisé en utilisant *Vagrant*
+et *Docker*.
 
-In addition, in this lab we will come back to the notion of **dynamic service discovery**, which have described in the context of **UDP**. One objective of the lab will be do design a service discovery protocol, which will be used to **be aware of HTTP servers appearing or disappearing from the infrastructure**. In reaction to these events, the **load balancer** should be automatically reconfigured.
+Architecture du système
+=======================
 
-### Description of the system to build
+Après nous être concertés pour déterminer le genre de services offerts
+par l’architecture web, nous nous sommes entendus pour créer un
+distributeur de citations générées par le programme UNIX *fortune*.
 
-The system that we will build in the lab is shown in the following diagram. Three types of users will interact with the system: 
+![Architecture du système](schema.png)
 
-* the **end-users**, who use their browser to **access the web application** deployed on top of the web infrastructure; 
+Détails des container
+---------------------
 
-* the **system administrators**, who use their browser to **monitor** the state of the infrastructure (e.g. see the list of running HTTP servers) and to **modify** the infrastructure (e.g. start/stop HTTP servers).
+### *Back-end*
 
-* the **testers**, who must **define and execute a validation strategy** with various **tools** (a browser, tcpdump, a terminal, custom test clients, etc.) to prove that the infrastructure behaves as it should.
+Le *back-end* est un serveur HTTP répondant à chaque requête par un JSON
+contenant une citation et l’adresse IP du back-end selon le motif
+suivant:
 
-[![](diagrams/overview.png)](diagrams/overview.png)
+`{quote:<citation>,ip:<IP du backend>}`
 
+L’utilité de fournir l’adresse IP est de donner une preuve au testeur
+que le *load-balancer* (décrit ci-après) fonctionne correctement.
 
-The system architecture highlights the following elements:
+Afin d’avoir un système le plus léger possible, et qui soit aisé à
+implémenter, le *back-end* à été réalisé en javascript avec *Node.js*.
 
-* the infrastructure is installed in a VirtualBox VM, managed by Vagrant;
+En parallèle, le *back-end* possède un *Heartbeat generator*, un
+programme en javascript envoyant en continu toutes les 10 secondes un
+message en UDP sur un port définit, sur l’adresse IP multicast définie
+`224.1.1.1`. Ce message JSON contient les 2 champs suivants:
 
-* several types of Docker containers (i.e. several images) are used in the infrastructure:
+-   le type du client ( backend ou fronten )
 
-  * One container hosts a server that acts both as **reverse proxy** and **load balancer**. You can chose the server that you like, but we recommend to use **apache httpd** (the main reason is that sticky sessions can be used without any commercial plugin).
-  
-  * Several containers (based on the same image) host an HTTP server that serves **static content** (html, js, css). We will refer to these containers as the **front-end web servers**. We ask you to use the **apache httpd server** and to write a **PHP** page (so that you can test the HTTP session API). The HTTP requests must be load-balanced between the containers and **sticky sessions** must be enabled.
-  
-  * Several containers (based the same image) host an HTTP server that serves **dynamic content** (resource representations in json). We call these containers te **back-end web servers**. We recommend that you use **node.js** and **express.js** to implement them. In this case too, the requests must be load-balanced between the containers, but without sticky sessions (the architecture is purely stateless in this case).
-  
-  * You do not have to worry about **database** and **caching containers**, but of course if you are up to the challenge, these would be a natural extension to the system.
-  
-  * As you can see, there are a couple of additional types of containers (marked with a '**?**') in the setup. Remember that you have to implement **dynamic discovery** with UDP. Remember that you also have to make it possible for the system administrator to **monitor and configure** the system via a web browser. You will need to use specific components for that purpose.
-  
-  
-### About the Web App
+-   l’ID du container *Docker*
 
-**The focus of the lab is on the web hosting infrastructure, not on the actual web application**. In the previous paragraphs, we have said that end-users would access a web app, which would actually involve front-end and back-end servers. But what do we mean by web app? 
+### *Front-end*
 
-You do not have to implement something very fancy, with a lot of functionality. At the minimum, what you need is:
+Le *front-end* est un serveur HTTP répondant à chaque requête par un
+page HTML contenant un javascript permettant de faire une requête pour
+récupérer une citation. Cette requête sera redirigée vers le back-end
+par le *reverse-proxy*. Afin de fournir une preuve au testeur que le
+*load-balancer* fonctionne correctement, la page HTML générée contient
+l’adresse IP du *front-end*.
 
-* to **serve an HTML page**, that will load a **javascript file**. Both files will be served by the web front-end.
+Pour les même raisons que pour le *back-end*, le *front-end* à été
+réalisé en javascript avec *Node.js*.
 
-* when executed by the browser, the javascript code should **send an AJAX request to the web backend**, retrieve some data and update the DOM. To make testing/demo easier, the returned data should be somewhat dynamic (fetching the same resource several times should return different values).
+De la même manière que le *back-end*, le *front-end* possède lui aussi
+un *heartbeat generator* envoyant des messages en continu sur l’adresse
+multicast `224.1.1.1` et sur un port définit.
 
-* **just as an example**, imagine that the backend manages the state of several thermometers (or other sensors). The front-end could return a page that displays the list of thermometers with their name, location and value. It would fetch the data by issue a request to an end-point such as `/api/thermometers`). If the temperatures are generated randomly, you have your dynamic data.
+### *Node controller*
 
+Le *node controller* (server) écoute sur un port et attend des paquet
+entrant contenant 2 champs:
 
+-   le type
 
-### Guidelines
+-   l’ID du container *Docker*
 
-* Work in groups of **4 students**.
+Le contrôleur contient une structure de donnée `client` et un tableau de
+client `clients[]`.
 
-* Each group creates **one and only one fork** of this repo. Other members of the group can then fork the "master" fork for the group.
+La structure de donnée `client` contient simplement des variable[^2]:
+`ip`, `id`, `type`, `date`[^3], …
 
-* In the `README.md`, write the names of all group members.
+À l’arrivée d’un message pas un client le serveur crée un client avec la
+structure décrite ci-dessus.
 
-* In the `README.md`, write the contributions of all group members (who was worked on what parts of the lab).
+Si l’adresse IP du client qui vient d’envoyer le message n’est pas
+contenu dans le tableau de clients que contient le serveur, le *node
+controller* ajoute le client précédemment créé au tableau de clients,
+met à jour le fichier de configuration d’*Apache* et redémarre le
+*reverse proxy*. Sinon, si l’adresse IP du client est déjà contenue dans
+le tableau, le *node controller* ne fait que mettre à jour le timestamp
+du client en question, puis supprime le client précédemment créé.
 
-* **Documentation** should be stored in the repo. We would prefer that you write it in **Markdown** files (so that it can be read online).
+En parallèle de ceci, Le serveur parcoure toutes les 5 seconde le
+tableau de client et vérifie le *timestamp* de chaque client. Si le
+temps écoulé depuis son arrivée dépasse 10 secondes, le *node controler*
+retire le client de la liste et met à jour le fichier de configuration
+d’*Apache* et redémarre le *reverse proxy*, sinon ne fait rien.
 
+### *Reverse proxy et load balancer*
 
-### Deliverables & deadlines
+Nous avons choisi d’implémenter ce point grâce au service *httpd*
+(*Apache 2*).
 
-* At the end of the lab, we need to be able to clone the "master" fork of the group, do a `vagrant up` and follow the instructions that you provide us in the documentation to test and validate the setup.
+Le *reverse proxy* est le seul point d’entrée extérieur à notre
+architecture. En effet il sert à masquer le fait qu’il y aie plusieurs
+machines derrière une adresse, il se chargera de transmettre les
+différentes requêtes au bon endroit et de retourner les réponses. Il
+fait en même temps la distribution du travail (*load balancer*)
+lorsqu’il a plusieurs possibilités vers qui envoyer une requête (parce
+qu’on a plusieurs machines qui sont capables de faire la même chose,
+plusieurs *front-end* et *back-end*) il va choisir de les distribuer
+équitablement afin de partager le travail. Nous avons choisi ici
+d’implémenter une méthode “Round-Robin”. La communication avec le
+*front-end* est en *sticky session* avec un cookie qui permet de
+spécifier la route (donc quel *front-end*) comme ça si un client a
+commencé à communiquer avec un *front-end* il va continuer avec ce
+*front-end* tant qu’il donne le cookie, si un nouveau client arrive
+(sans cookie donc) le *load balancer* va le rediriger au prochain
+*front-end* comme indiqué par notre police “Round-Robin”.
 
-* At the end of the lab, we will ask you to do a demo and to explain us how you have designed and implemented the infrastructure. Remember that we expect you to share the tasks, BUT that we expect you to share information: at the end, everyone must be clear on what has been done on all aspects of the lab!
+Le fichier de configuration du *reverse proxy* —*load balancer* est
+généré par le *node controller* et est mis à jour à chaque changement
+dans les services disponibles (nouveau *front-end* ou *back-end* ou bien
+si un *front-end* ou *back-end* n’est plus disponible). Pour rendre
+effectif la modification nous relançons la machine depuis le *node
+controller* (qui a les privilèges) avec *Dockerode*, dans le fichier de
+configuration de *httpd* il est spécifié de charger notre fichier de
+configuration spécifique qui est partagé entre le *node controller* et
+cette machine.
 
-* At the end of the lab, we expect to have a report that documents your design, your implementation choices, the issues that you had to solve. Most importantly, we expect to find a clear description of your validation strategy (how did you verify that the infrastructure works as expected?).
+Note: La route pour la *sticky session* est l’ID unique du container
+vers qui la route pointe, ceci nous garantit que si la machine tombe et
+se relance la route sera conservée, si on utilisais des entier (1, 2, 3,
+…) si la machine 2 tombe et que la machine 3 prends la place du 2 la
+route 2 renverrait vers une autre machine qu’auparavant. Avec les ID
+uniques une route ne pointera que vers une seule machine et toujours la
+même.
 
-* **We will work on this lab for the next 4 weeks. On May 27th and May 29th, we will ask you to demonstrate your work. On June 1st, we will ask you to submit your final repo and documentation.**
+Protocoles de communications utilisés
+-------------------------------------
 
+Tous les échanges effectués entre les *front-end*s, les *back-end*s et
+le *node controller* sont effectués par UDP et sont des JSONs.
 
-### Resources
+Strategie de validation
+=======================
 
-* The [express.js](http://expressjs.com/) web framework (used in previous labs, which you can look at for inspiration).
+Test du *load balancer*
+-----------------------
 
-* A **very useful** list of [Docker libraries](https://docs.docker.com/reference/api/remote_api_client_libraries/) and tools.
+Afin de tester que notre implémentation soit correcte, un web browser
+(Google Chrome) a été utilisé pour ouvrir la page web, qui affiche aussi
+bien l’adresse IP du *font-end* que celle du *back-end*. Lorsque la
+quote était renouvellée en appuyant sur le bouton de la page web pour
+renouveller les quotes, l’adresse IP du *back-end* était effectivement
+modifiée. Par contre, si la page était rechargée, le *front-end* était
+le même. Ce qui est normal, le cookie est conservé. En utilisant le mode
+de navigation privée de Chrome, qui ne conserve pas les cookies, et
+n’utilise pas de cache, l’adresse IP du *front-end* change avec un
+rechargement de la page. Le *load balancer* fonctionne donc
+correctement.
 
-* Sharing data between Docker containers with [volumes](https://docs.docker.com/userguide/dockervolumes/).
+Test du *node controller*
+-------------------------
 
-* If you want to talk to the Docker daemon (running on the VM) from a Docker container, read [this](https://docs.docker.com/reference/run/#runtime-privilege-linux-capabilities-and-lxc-configuration).
+Afin de tester si le système détecte l’apparition ou la disparition d’un
+node, un container *Docker* est supprimé, dans les quelques secondes
+suivantes, la configuration du *reverse proxy* est modifié pour prendre
+en compte la disparition du nœud. Ensuite un nouveau container *Docker*
+est créé. À nouveau, la configuration est modifiée pour prendre en
+compte ces changements.
 
+Conclusions
+===========
 
-* The documentation of apache httpd contains information about [reverse proxies](http://httpd.apache.org/docs/2.4/mod/mod_proxy.html), [load balancing](http://httpd.apache.org/docs/2.4/mod/mod_proxy_balancer.html) and [virtual hosts](http://httpd.apache.org/docs/2.4/vhosts/).
+À la fin de ce laboratoire, nous avons obtenu un système fonctionnel, et
+se comportant de manière idoine, et fidèle aux objectifs fixés. Nous
+avons également appris de manière concrète le fonctionnement d’une
+architecture web. Nous pouvons donc en conclure que ce laboratoire est
+un succès.
 
-* [PM2](https://github.com/Unitech/pm2) is a process manager for Node.js. Useful if you want to run several Node.js scripts in the same Docker container. Also see [this discussion](https://blog.phusion.nl/2015/01/20/baseimage-docker-fat-containers-treating-containers-vms/).
+[^1]: Fortement inspiré de `README.md` fourni dans le cadre de ce
+    laboratoire.
 
-* A nice [companion tool](https://github.com/Tjatse/pm2-gui) for PM2, providing a web ui for it.
+[^2]: voir code source
 
+[^3]: `DATE` = chiffre représentant le nombre de millisecondes écoulées
+    depuis l’epoch.
 
-* A site that enlists various [template engines](http://garann.github.io/template-chooser/).
