@@ -171,6 +171,95 @@ en compte la disparition du nœud. Ensuite un nouveau container *Docker*
 est créé. À nouveau, la configuration est modifiée pour prendre en
 compte ces changements.
 
+Marche à suivre pour valider l’architecture
+-------------------------------------------
+
+### Mise en place
+
+1.  Lancer Vagrant dans le repertoire ou se trouve le fichier
+    `Vagrantfile`.\
+    `$ vagrant up`
+
+2.  Se logger dans vagrant.\
+    `$ vagrant ssh`
+
+3.  Créer les images *Docker* à l’aide des scripts fournis.\
+    `$ cd /vagrant/backend`\
+    `$ ./createDockerImage.sh`\
+    `$ cd /vagrant/frontend`\
+    `$ ./createDockerImage.sh`\
+    `$ cd /vagrant/node-controller`\
+    `$ ./createDockerImage.sh`\
+    `$ cd /vagrant/reverse-proxy-lb`\
+    `$ ./createDockerImage.sh`
+
+4.  (facultatif) Si on veut visulaiser les container *Docker* avec une
+    interface graphique, on peut aussi construire l’image *DockerUI*\
+    `$ cd /vagrant/dockerUI`\
+    `$ ./createDockerImage.sh`
+
+5.  Lancer les container *Docker* à l’aide des scripts fournis. (Notons
+    qu’il faut fournir un nom pour les back-ends et front-ends)\
+    `$ cd /vagrant/backend`\
+    `$ ./startContainers.sh backend1`\
+    `$ ./startContainers.sh backend2`\
+    `$ cd /vagrant/frontend`\
+    `$ ./startContainers.sh frontend1`\
+    `$ ./startContainers.sh frontend2`\
+    `$ ./startContainers.sh frontend3`\
+    `$ cd /vagrant/node-controller`\
+    `$ ./startContainers.sh`\
+    `$ cd /vagrant/reverse-proxy-lb`\
+    `$ ./startContainers.sh`
+
+6.  (facultatif) Si on veut utiliser DockerUI, il faut aussi lancer un
+    container.\
+    `$ cd /vagrant/dockerUI`\
+    `$ ./startContainers.sh`
+
+### Test du *back-end*, du *front-end*, et du *reverse proxy*
+
+1.  Lancer un navigateur web (par exemple Google Chrome) et entrer l’url
+    `192.168.42.42` en utilisant le port standard (80). Nous pouvons
+    voire l’adresse IP du front-end et du back-end.
+
+![image](test1.png)
+
+À présent nous sommes sûr que le *back-end*, le *front-end*, et le
+*reverse proxy* fonctionnent.
+
+### Test du load balancer
+
+1.  Appuyer plusieurs fois sur le boutton “*Get quote!*”. Nous pouvons
+    voire que l’adresse IP du front-end reste fixe, mais que celle du
+    back-end change.
+
+2.  Recharger plusieurs fois la page après avoir éliminé les cookies du
+    navigateur. Nous observons que l’adresse IP du front-end est aussi
+    modifiée.
+
+  --------------------- ---------------------
+   ![image](test2.png)   ![image](test3.png)
+   ![image](test4.png)   ![image](test5.png)
+  --------------------- ---------------------
+
+À présent nous sommes sûr que le *load balancer* fonctionne.
+
+### Test du node balancer
+
+1.  Nous démarrons des nouveaux *back-end*s ou des nouveaux
+    *front-end*s. Après quelques secondes, ils sont trouvés par le *node
+    balancer*, et peuvent être utilisés.
+
+2.  Nous supprimons des *back-end*s ou des *front-end*s Après quelques
+    secondes, le *node balancer* a reconfiguré le *load balancer* pour
+    prendre en compte le nouvel état du système. Il est possible de lire
+    ce fichier, qui se trouve dans le répertoire “`shared_volume`”, et
+    est nommé “`httpd-vhosts.conf`”, et de trouver uniquement les
+    containers *Docker* disponibles.
+
+À présent nous sommes sûr que le *node controller* fonctionne.
+
 Conclusions
 ===========
 

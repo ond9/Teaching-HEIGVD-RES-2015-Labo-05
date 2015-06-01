@@ -49,7 +49,7 @@ Après nous être concertés pour déterminer le genre de services offerts par l
 pour créer un distributeur de citations générées par le programme UNIX \emph{fortune}.
 \begin{figure}[h!]
 	\centering
-	\includegraphics[scale=0.5]{schema.pdf}
+	\includegraphics[scale=0.5]{schema.png}
 	\caption{Architecture du système}
 \end{figure}
 
@@ -155,6 +155,80 @@ Afin de tester si le système détecte l'apparition ou la disparition d'un node,
 les quelques secondes suivantes, la configuration du \emph{reverse proxy} est modifié pour prendre en compte la disparition du
 n\oe{}ud. Ensuite un nouveau container \emph{Docker} est créé. À nouveau, la configuration est modifiée pour prendre en compte
 ces changements. 
+
+\subsection{Marche à suivre pour valider l'architecture}
+\subsubsection{Mise en place}
+\begin{enumerate}
+	\item Lancer Vagrant dans le repertoire ou se trouve le fichier \texttt{Vagrantfile}.\\
+		\texttt{\$ vagrant up}
+	\item Se logger dans vagrant.\\
+		\texttt{\$ vagrant ssh}
+	\item Créer les images \emph{Docker} à l'aide des scripts fournis.\\
+		\texttt{\$ cd /vagrant/backend}\\
+		\texttt{\$ ./createDockerImage.sh}\\
+		\texttt{\$ cd /vagrant/frontend}\\
+		\texttt{\$ ./createDockerImage.sh}\\
+		\texttt{\$ cd /vagrant/node-controller}\\
+		\texttt{\$ ./createDockerImage.sh}\\
+		\texttt{\$ cd /vagrant/reverse-proxy-lb}\\
+		\texttt{\$ ./createDockerImage.sh}
+	\item (facultatif) Si on veut visulaiser les container \emph{Docker} avec une interface graphique, on peut aussi construire
+		l'image \emph{DockerUI}\\
+		\texttt{\$ cd /vagrant/dockerUI}\\
+		\texttt{\$ ./createDockerImage.sh}
+	\item Lancer les container \emph{Docker} à l'aide des scripts fournis. (Notons qu'il faut fournir un nom pour les back-ends et front-ends)\\
+		\texttt{\$ cd /vagrant/backend}\\
+		\texttt{\$ ./startContainers.sh backend1}\\
+		\texttt{\$ ./startContainers.sh backend2}\\
+		\texttt{\$ cd /vagrant/frontend}\\
+		\texttt{\$ ./startContainers.sh frontend1}\\
+		\texttt{\$ ./startContainers.sh frontend2}\\
+		\texttt{\$ ./startContainers.sh frontend3}\\
+		\texttt{\$ cd /vagrant/node-controller}\\
+		\texttt{\$ ./startContainers.sh}\\
+		\texttt{\$ cd /vagrant/reverse-proxy-lb}\\
+		\texttt{\$ ./startContainers.sh}
+	\item (facultatif) Si on veut utiliser DockerUI, il faut aussi lancer un container.\\
+		\texttt{\$ cd /vagrant/dockerUI}\\
+		\texttt{\$ ./startContainers.sh}
+\end{enumerate}
+
+\subsubsection{Test du \emph{back-end}, du \emph{front-end}, et du \emph{reverse proxy}}
+\begin{enumerate}
+	\item Lancer un navigateur web (par exemple Google Chrome) et entrer l'url \texttt{192.168.42.42} en utilisant le port standard (80).
+Nous pouvons voire l'adresse IP du front-end et du back-end.
+\end{enumerate}
+\begin{center}
+	\includegraphics[scale=0.5]{test1.png}
+\end{center}
+
+À présent nous sommes sûr que le \emph{back-end}, le \emph{front-end}, et le \emph{reverse proxy} fonctionnent.
+
+\subsubsection{Test du load balancer}
+\begin{enumerate}
+	\item Appuyer plusieurs fois sur le boutton ``\emph{Get quote!}''. Nous pouvons voire que l'adresse IP du front-end reste fixe, mais que celle du back-end change.
+	\item Recharger plusieurs fois la page après avoir éliminé les cookies du navigateur. Nous observons que l'adresse IP du front-end est aussi modifiée.
+\end{enumerate}
+\begin{center}
+\begin{tabular}{cc}
+	\includegraphics[scale=0.3]{test2.png} & \includegraphics[scale=0.3]{test3.png} \\
+	\includegraphics[scale=0.3]{test4.png} & \includegraphics[scale=0.3]{test5.png} \\
+\end{tabular}
+\end{center}
+
+À présent nous sommes sûr que le \emph{load balancer} fonctionne.
+
+\subsubsection{Test du node balancer}
+\begin{enumerate}
+	\item Nous démarrons des nouveaux \emph{back-end}s ou des nouveaux \emph{front-end}s.
+Après quelques secondes, ils sont trouvés par le \emph{node balancer}, et peuvent être utilisés.
+	\item Nous supprimons des \emph{back-end}s ou des \emph{front-end}s
+Après quelques secondes, le \emph{node balancer} a reconfiguré le \emph{load balancer} pour prendre en compte le nouvel état du système.
+Il est possible de lire ce fichier, qui se trouve dans le répertoire ``\texttt{shared\_volume}'', et est nommé ``\texttt{httpd-vhosts.conf}'',
+et de trouver uniquement les containers \emph{Docker} disponibles.
+\end{enumerate}
+
+À présent nous sommes sûr que le \emph{node controller} fonctionne.
 
 \section{Conclusions}
 À la fin de ce laboratoire, nous avons obtenu un système fonctionnel, et se comportant de manière idoine, et fidèle aux
